@@ -1,12 +1,19 @@
 from httpx import AsyncClient
 import feedparser
 import asyncio
+from aiogram import Bot, Dispatcher
 
 #Тут подгружаем процедуры из наших модулей
 from parse import parselink
 from sql import create_table, save_to_db, select_for_db
 
-async def main():
+#Подгружаем переменные
+from variables import BOT_TOKEN, CHAT_ID, CHANNEL_ID
+
+#Подключаем бота
+bot = Bot(token=BOT_TOKEN)
+
+async def feed_reader():
     rss_link = 'https://habr.com/ru/rss/articles/?fl=ru&limit=10'
 
     #создаем БД, если ее нет
@@ -29,7 +36,7 @@ async def main():
                 #Добавляем запись в базу данных:
                 await save_to_db(news_id, news['title'], news['link'])
 
-                print (f"Новость ID {news_id} добавлена в БД")
+                await send_message_to_bot(f'<b>{news["title"]}</b>\n<a href="{news["link"]}">Link</a>')
 
                 # - спим 4 секунды, можно больше после каждой итерации с новой записью.
                 await asyncio.sleep(4)
@@ -37,6 +44,26 @@ async def main():
             else:
                 #Если запись уже есть - пропускаем
                 continue
+async def main():
+    #Не забываем про диспетчера и удаляем webhook на всякий случай
+    dp = Dispatcher()
+    await bot.delete_webhook(drop_pending_updates=True)
+
+    #создаем БД, есои ее нет
+    await create_table()
+
+    #вызываем чтение ленты
+    await feed_reader()
+
+
+    #пуллим бот - чтобы наш скрипт постоянно запрашивал сервер ТГ о состоянии нашего бота
+    await dp.start_polling(bot)
+
+
+async def send_message_to_bot(text):
+    await bot.send_message(chat_id=CHANNEL_ID,
+                           text=text,
+                           parse_mode='HTML')
 
 if __name__ == '__main__':
     asyncio.run(main())
