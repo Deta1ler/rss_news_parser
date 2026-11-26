@@ -2,6 +2,7 @@ from httpx import AsyncClient
 import feedparser
 import asyncio
 from aiogram import Bot, Dispatcher
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 #Тут подгружаем процедуры из наших модулей
 from parse import parselink
@@ -53,8 +54,16 @@ async def main():
     await create_table()
 
     #вызываем чтение ленты
-    await feed_reader()
+    #await feed_reader()
 
+    #создаем экземпляр класса AsyncIOScheduler
+    scheduler = AsyncIOScheduler()
+
+    #создаем задачу в режиме 'cron' которая будет запускать процедуру feed_reader() в 10:30 и 17:30
+    scheduler.add_job(feed_reader, 'cron', hour='12', minute='5')
+    
+    #стартуем работу
+    scheduler.start()
 
     #пуллим бот - чтобы наш скрипт постоянно запрашивал сервер ТГ о состоянии нашего бота
     await dp.start_polling(bot)
